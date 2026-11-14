@@ -15,7 +15,7 @@ st.write(
     " parametri geometrici ed eseguire i calcoli meccanici in tempo reale."
 )
 
-# Campo per inserire la chiave API (precompilato con la tua chiave, modificabile se necessario)
+# Campo per inserire la chiave API (precompilato con la tua chiave)
 api_key_input = st.text_input(
     "Chiave API Gemini",
     type="password",
@@ -28,8 +28,8 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-  # Mostra l'anteprima dell'immagine caricata
-  st.image(uploaded_file, caption="Disegno caricato", use_column_width=True)
+  # Mostra l'anteprima dell'immagine caricata (con correzione del warning)
+  st.image(uploaded_file, caption="Disegno caricato", width="stretch")
 
   if st.button("🚀 Avvia Analisi e Calcoli"):
     if not api_key_input:
