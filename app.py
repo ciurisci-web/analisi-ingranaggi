@@ -11,8 +11,9 @@ st.set_page_config(
 
 st.title("⚙️ Analisi Ingranaggio con Gemini AI")
 st.write(
-    "Carica il disegno tecnico di un ingranaggio per estrarre i parametri"
-    " geometrici ed eseguire i calcoli meccanici in tempo reale."
+    "Carica il disegno tecnico in formato **immagine (JPG/PNG)** o **PDF** per"
+    " estrarre i parametri geometrici ed eseguire i calcoli meccanici in tempo"
+    " reale."
 )
 
 # Campo per inserire la chiave API di tipo Auth (AQ...)
@@ -22,32 +23,40 @@ api_key_input = st.text_input(
     value="AQ.Ab8RN6I6EO0oJouGJgzxwoohao5ArEiq73sP-tG4UKVrQgQguA",
 )
 
-# Pulsante nativo per caricare l'immagine
+# Pulsante nativo per caricare file (immagini o PDF)
 uploaded_file = st.file_uploader(
-    "Scegli l'immagine del disegno (JPG o PNG)", type=["jpg", "jpeg", "png"]
+    "Scegli il file del disegno (JPG, PNG o PDF)",
+    type=["jpg", "jpeg", "png", "pdf"],
 )
 
 if uploaded_file is not None:
-  # Mostra l'anteprima dell'immagine caricata
-  st.image(uploaded_file, caption="Disegno caricato", width="stretch")
+  mime_type = uploaded_file.type
+
+  # Mostra l'anteprima o le informazioni in base al tipo di file
+  if mime_type in ["image/jpeg", "image/png"]:
+    st.image(uploaded_file, caption="Disegno caricato (Immagine)", width="stretch")
+  elif mime_type == "application/pdf":
+    st.info(
+        f"📄 File PDF caricato con successo: **{uploaded_file.name}**"
+        " (Pronto per l'analisi nativa)"
+    )
 
   if st.button("🚀 Avvia Analisi e Calcoli"):
     if not api_key_input:
       st.error("Per favore, inserisci una chiave API valida.")
     else:
       with st.spinner(
-          "Analisi del disegno in corso con il SDK ufficiale e il modello"
-          " aggiornato..."
+          "Analisi del documento in corso con intelligenza artificiale..."
       ):
         try:
-          # Inizializza il client ufficiale Google GenAI (compatibile con le chiavi AQ...)
+          # Inizializza il client ufficiale Google GenAI
           client = genai.Client(api_key=api_key_input)
 
-          # Carica l'immagine utilizzando Pillow
-          image = PIL.Image.open(uploaded_file)
+          # Legge i byte del file (funziona sia per immagini che per PDF)
+          file_bytes = uploaded_file.getvalue()
 
           prompt = """
-                    Analizza questo disegno tecnico di un ingranaggio meccanico. 
+                    Analizza questo disegno tecnico o documento di un ingranaggio meccanico. 
                     Estrai i parametri geometrici principali e restituisci ESCLUSIVAMENTE un oggetto JSON valido con le seguenti chiavi esatte:
                     - "modulo": float o null
                     - "numero_denti": int o null
@@ -58,10 +67,13 @@ if uploaded_file is not None:
                     Se un valore non è esplicitamente indicato ma può essere dedotto o stimato con ragionevole certezza, segnalalo, altrimenti metti null.
                     """
 
-          # Chiamata al modello aggiornato consigliato da Google
+          # Invoca il modello gemini-3.8-flash passando i byte e il mimetype corretto (immagine o PDF)
           response = client.models.generate_content(
               model="gemini-3.8-flash",
-              contents=[prompt, image],
+              contents=[
+                  prompt,
+                  types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+              ],
               config=types.GenerateContentConfig(
                   response_mime_type="application/json", temperature=0.1
               ),
