@@ -15,14 +15,14 @@ st.write(
     " parametri geometrici ed eseguire i calcoli meccanici in tempo reale."
 )
 
-# Campo per inserire la chiave API (precompilato con la tua chiave)
+# Campo per inserire la chiave API o il token
 api_key_input = st.text_input(
-    "Chiave API Gemini",
+    "Chiave API Gemini / Token",
     type="password",
     value="AQ.Ab8RN6KJaaLdmFug342-gyeYIRsxj_-NRQmErz-Nfl_qgRVapQ",
 )
 
-# Pulsante nativo per caricare l'immagine (funziona perfettamente da PC e smartphone)
+# Pulsante nativo per caricare l'immagine
 uploaded_file = st.file_uploader(
     "Scegli l'immagine del disegno (JPG o PNG)", type=["jpg", "jpeg", "png"]
 )
@@ -44,7 +44,7 @@ if uploaded_file is not None:
           image_base64 = base64.b64encode(image_bytes).decode("utf-8")
           mime_type = uploaded_file.type
 
-          # Chiamata alle API REST di Gemini aggiornata con il modello stabile gemini-1.5-flash
+          # Endpoint con il modello stabile gemini-1.5-flash
           url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key_input}"
 
           prompt = """
@@ -102,7 +102,6 @@ if uploaded_file is not None:
           z = dati.get("numero_denti")
 
           if m and z:
-            # Formule geometriche per ingranaggi cilindrici
             d = m * z
             da = m * (z + 2)
             df = m * (z - 2.5)
@@ -124,5 +123,11 @@ if uploaded_file is not None:
                 " denti non sono stati rilevati chiaramente dall'IA."
             )
 
+        except urllib.error.HTTPError as e:
+          # Cattura e mostra il testo esatto dell'errore restituito da Google
+          error_details = e.read().decode("utf-8")
+          st.error(
+              f"Errore HTTP {e.code} dal server di Google:\n\n{error_details}"
+          )
         except Exception as e:
-          st.error(f"Errore durante l'elaborazione della richiesta: {e}")
+          st.error(f"Errore imprevisto durante l'elaborazione: {e}")
