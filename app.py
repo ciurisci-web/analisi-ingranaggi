@@ -12,8 +12,9 @@ st.set_page_config(
 
 st.title("⚙️ Analisi Ingranaggio con Gemini AI")
 st.write(
-    "Carica il disegno tecnico (immagine o PDF), verifica ed edita i dati"
-    " estratti, quindi avvia i calcoli meccanici."
+    "Carica il disegno tecnico (immagine o PDF). Verranno mostrati nei campi"
+    " di input **solo i dati effettivamente riconosciuti dal file**; gli altri"
+    " saranno calcolati automaticamente."
 )
 
 # Campo per inserire la chiave API di tipo Auth (AQ...)
@@ -52,20 +53,20 @@ if uploaded_file is not None:
 
           prompt = """
                     Analizza questo disegno tecnico o documento di un ingranaggio meccanico. 
-                    Estrai i parametri geometrici principali e restituisci ESCLUSIVAMENTE un oggetto JSON valido con le seguenti chiavi esatte:
+                    Estrai i parametri geometrici presenti e restituisci ESCLUSIVAMENTE un oggetto JSON valido. 
+                    Se un parametro NON è esplicitamente indicato nel disegno, imposta il suo valore a null (non inventarlo). Le chiavi esatte sono:
                     - "modulo": float o null
                     - "numero_denti": int o null
                     - "angolo_pressione_gradi": float o null
                     - "diametro_esterno_mm": float o null
                     - "larghezza_dente_mm": float o null
-                    - "angolo_elica_gradi": float o 0
+                    - "angolo_elica_gradi": float o null
                     - "diametro_base_mm": float o null
                     - "elica_base_gradi": float o null
                     - "coefficiente_spostamento": float o null
                     - "spessore_primitivo_mm": float o null
                     - "numero_denti_quota_w": int o null
                     - "diametro_rullo_mm": float o null
-                    Se un valore non è esplicitamente indicato ma può essere dedotto o stimato con ragionevole certezza, segnalalo, altrimenti metti null.
                     """
 
           response = client.models.generate_content(
@@ -80,105 +81,109 @@ if uploaded_file is not None:
           )
 
           st.session_state.extracted_data = json.loads(response.text)
-          st.success(
-              "Dati estratti con successo! Controllali ed eventualmente"
-              " modificali qui sotto."
-          )
+          st.success("Estrazione completata! Controlla i dati rilevati.")
 
         except Exception as e:
           st.error(f"Errore durante l'estrazione: {e}")
 
-# Se i dati sono stati estratti, mostra la sezione di verifica e modifica prima dei calcoli
+# Se i dati sono stati estratti, costruiamo il form dinamico
 if st.session_state.extracted_data is not None:
-  st.markdown("---")
-  st.subheader("📝 Verifica e Modifica Dati di Input")
-  st.write(
-      "Qui puoi correggere o inserire manualmente i valori prima di eseguire i"
-      " calcoli meccanici definitivi."
-  )
-
   dati = st.session_state.extracted_data
 
+  st.markdown("---")
+  st.subheader("📝 Dati Rilevati dal File & Conferma")
+  st.write(
+      "I campi sottostanti mostrano **solo** ciò che l'IA ha letto nel file."
+      " Puoi correggerli prima di procedere con i calcoli."
+  )
+
   with st.form("input_correction_form"):
-    col1, col2 = st.columns(2)
+    user_inputs = {}
 
-    with col1:
-      f_modulo = st.number_input(
-          "Modulo (m)",
-          value=float(dati.get("modulo") or 2.0),
+    # I parametri geometrici fondamentali (modulo e denti) vengono richiesti se presenti o inizializzati
+    f_modulo = st.number_input(
+        "Modulo (m) *",
+        value=float(dati.get("modulo") or 2.0),
+        format="%.3f",
+    )
+    f_z = st.number_input(
+        "Numero Denti (z) *",
+        value=int(dati.get("numero_denti") or 30),
+        step=1,
+    )
+    f_alpha = st.number_input(
+        "Angolo di Pressione (°) *",
+        value=float(dati.get("angolo_pressione_gradi") or 20.0),
+        format="%.2f",
+    )
+    f_beta = st.number_input(
+        "Angolo Elica (°) *",
+        value=float(dati.get("angolo_elica_gradi") or 0.0),
+        format="%.2f",
+    )
+
+    st.markdown("---")
+    st.write(
+        "**Parametri opzionali trovati nel file (verranno inseriti nei calcoli"
+        " se valorizzati):**"
+    )
+
+    # Mostriamo a schermo e raccogliamo solo i campi che NON sono null nel file
+    if dati.get("coefficiente_spostamento") is not None:
+      user_inputs["coefficiente_spostamento"] = st.number_input(
+          "Coefficiente Spostamento (x) [Trovato nel file]",
+          value=float(dati.get("coefficiente_spostamento")),
           format="%.3f",
-      )
-      f_z = st.number_input(
-          "Numero Denti (z)", value=int(dati.get("numero_denti") or 30), step=1
-      )
-      f_alpha = st.number_input(
-          "Angolo di Pressione (°)",
-          value=float(dati.get("angolo_pressione_gradi") or 20.0),
-          format="%.2f",
-      )
-      f_beta = st.number_input(
-          "Angolo Elica (°)",
-          value=float(dati.get("angolo_elica_gradi") or 0.0),
-          format="%.2f",
-      )
-      f_x = st.number_input(
-          "Coefficiente Spostamento (x)",
-          value=float(dati.get("coefficiente_spostamento") or 0.0),
-          format="%.3f",
-      )
-      f_larg = st.number_input(
-          "Larghezza Dente (mm)",
-          value=float(dati.get("larghezza_dente_mm") or 20.0),
-          format="%.2f",
       )
 
-    with col2:
-      f_de = st.number_input(
-          "Diametro Esterno (mm)",
-          value=float(dati.get("diametro_esterno_mm") or 0.0),
+    if dati.get("diametro_esterno_mm") is not None:
+      user_inputs["diametro_esterno_mm"] = st.number_input(
+          "Diametro Esterno (da in mm) [Trovato nel file]",
+          value=float(dati.get("diametro_esterno_mm")),
           format="%.3f",
       )
-      f_db = st.number_input(
-          "Diametro Base (mm)",
-          value=float(dati.get("diametro_base_mm") or 0.0),
+
+    if dati.get("diametro_base_mm") is not None:
+      user_inputs["diametro_base_mm"] = st.number_input(
+          "Diametro Base (db in mm) [Trovato nel file]",
+          value=float(dati.get("diametro_base_mm")),
           format="%.3f",
       )
-      f_spess = st.number_input(
-          "Spessore su Primitivo (mm)",
-          value=float(dati.get("spessore_primitivo_mm") or 0.0),
+
+    if dati.get("spessore_primitivo_mm") is not None:
+      user_inputs["spessore_primitivo_mm"] = st.number_input(
+          "Spessore su Primitivo (s in mm) [Trovato nel file]",
+          value=float(dati.get("spessore_primitivo_mm")),
           format="%.3f",
       )
-      # Quota W: Numero di denti k
-      default_k = max(
-          1, int((dati.get("numero_denti") or 30) / 9 + 0.5)
-      )  # stima empirica standard
-      f_nw = st.number_input(
-          "Quota W - Numero Denti (k)",
-          value=int(dati.get("numero_denti_quota_w") or default_k),
+
+    if dati.get("numero_denti_quota_w") is not None:
+      user_inputs["numero_denti_quota_w"] = st.number_input(
+          "Quota W - Numero Denti (k) [Trovato nel file]",
+          value=int(dati.get("numero_denti_quota_w")),
           step=1,
       )
-      # Quota Rulli: Diametro del rullo dr
-      default_dr = 1.72 * (dati.get("modulo") or 2.0)
-      f_dr = st.number_input(
-          "Quota Rulli - Diametro Rullo (dr in mm)",
-          value=float(dati.get("diametro_rullo_mm") or default_dr),
+
+    if dati.get("diametro_rullo_mm") is not None:
+      user_inputs["diametro_rullo_mm"] = st.number_input(
+          "Quota Rulli - Diametro Rullo (dr in mm) [Trovato nel file]",
+          value=float(dati.get("diametro_rullo_mm")),
           format="%.3f",
       )
 
     submitted_calc = st.form_submit_button("📐 Esegui Calcoli Meccanici")
 
   if submitted_calc:
-    # Elaborazione basata sui dati confermati/modificati dall'utente
     m = f_modulo
     z = f_z
     alpha_deg = f_alpha
     beta_deg = f_beta
-    x = f_x
-    k = f_nw
-    dr = f_dr
 
     alpha_rad = math.radians(alpha_deg)
     beta_rad = math.radians(beta_deg)
+
+    # Se l'utente ha modificato/inserito il coefficiente di spostamento lo usiamo, altrimenti vale 0.0
+    x = user_inputs.get("coefficiente_spostamento", 0.0)
 
     if beta_deg > 0:
       mt = m / math.cos(beta_rad)
@@ -194,18 +199,26 @@ if st.session_state.extracted_data is not None:
       db_calc = d * math.cos(alpha_rad)
       beta_b_calc = 0.0
 
-    db = f_db if f_db > 0 else db_calc
+    # Diametro Base: se era nel file usiamo quello, altrimenti lo calcoliamo
+    db = user_inputs.get("diametro_base_mm", db_calc)
     elica_base = beta_b_calc
 
+    # Spessore primitivo: se era nel file usiamo quello, altrimenti lo calcoliamo
     s_calc = mt * (math.pi / 2.0 + 2.0 * x * math.tan(alpha_t_rad))
-    s = f_spess if f_spess > 0 else s_calc
+    s = user_inputs.get("spessore_primitivo_mm", s_calc)
 
+    # Diametro esterno: se era nel file usiamo quello, altrimenti lo calcoliamo
     da_calc = mt * (z + 2.0 * (1.0 + x))
-    da = f_de if f_de > 0 else da_calc
+    da = user_inputs.get("diametro_esterno_mm", da_calc)
+
     df = da - 2.25 * mt
     passo = math.pi * mt
 
-    # Calcolo Quota W (Misura su k denti)
+    # Quota W (se non specificata, calcoliamo k stimato e W teorico)
+    k = user_inputs.get("numero_denti_quota_w")
+    if k is None:
+      k = max(1, int(z / 9 + 0.5))
+
     inv_alpha_t = math.tan(alpha_t_rad) - alpha_t_rad
     wk_calc = (
         m
@@ -214,7 +227,11 @@ if st.session_state.extracted_data is not None:
         + 2.0 * x * m * math.sin(alpha_rad)
     )
 
-    # Calcolo Quota Rulli / Sfere (M) stimata con rigore geometrico
+    # Quota Rulli (se non specificata, stimiamo un diametro rullo standard dr e calcoliamo M)
+    dr = user_inputs.get("diametro_rullo_mm")
+    if dr is None:
+      dr = 1.72 * m
+
     m_rulli_est = d + 2.0 * m * (1.0 + x) + dr * 1.15
 
     st.success("Calcoli completati con successo!")
@@ -233,7 +250,7 @@ if st.session_state.extracted_data is not None:
       st.metric("Spessore su Primitivo (s)", f"{s:.3f} mm")
       st.metric(f"Quota W (Misura su {k} denti)", f"{wk_calc:.3f} mm")
       st.metric(
-          f"Quota Rulli M (con rullo ø {dr} mm)", f"{m_rulli_est:.3f} mm"
+          f"Quota Rulli M (con rullo ø {dr:.2f} mm)", f"{m_rulli_est:.3f} mm"
       )
       st.metric("Diametro di Testa (da)", f"{da:.2f} mm")
       st.metric("Diametro di Fondo (df)", f"{df:.2f} mm")
