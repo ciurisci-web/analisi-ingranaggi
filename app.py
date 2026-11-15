@@ -36,8 +36,8 @@ if uploaded_file is not None:
       st.error("Per favore, inserisci una chiave API valida.")
     else:
       with st.spinner(
-          "Analisi del disegno in corso con il SDK ufficiale e chiavi di"
-          " autorizzazione..."
+          "Analisi del disegno in corso con il SDK ufficiale e il modello"
+          " aggiornato..."
       ):
         try:
           # Inizializza il client ufficiale Google GenAI (compatibile con le chiavi AQ...)
@@ -58,9 +58,9 @@ if uploaded_file is not None:
                     Se un valore non è esplicitamente indicato ma può essere dedotto o stimato con ragionevole certezza, segnalalo, altrimenti metti null.
                     """
 
-          # Chiamata al modello tramite il nuovo client (utilizziamo gemini-2.5-flash)
+          # Chiamata al modello aggiornato consigliato da Google
           response = client.models.generate_content(
-              model="gemini-2.5-flash",
+              model="gemini-3.8-flash",
               contents=[prompt, image],
               config=types.GenerateContentConfig(
                   response_mime_type="application/json", temperature=0.1
