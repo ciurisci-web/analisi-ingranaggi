@@ -28,7 +28,7 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-  # Mostra l'anteprima dell'immagine caricata (con correzione del warning)
+  # Mostra l'anteprima dell'immagine caricata
   st.image(uploaded_file, caption="Disegno caricato", width="stretch")
 
   if st.button("🚀 Avvia Analisi e Calcoli"):
@@ -44,8 +44,8 @@ if uploaded_file is not None:
           image_base64 = base64.b64encode(image_bytes).decode("utf-8")
           mime_type = uploaded_file.type
 
-          # Chiamata alle API REST di Gemini (modello gemini-2.5-flash)
-          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key_input}"
+          # Chiamata alle API REST di Gemini aggiornata con il modello stabile gemini-1.5-flash
+          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key_input}"
 
           prompt = """
                     Analizza questo disegno tecnico di un ingranaggio meccanico. 
