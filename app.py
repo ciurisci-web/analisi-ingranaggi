@@ -1,8 +1,8 @@
-import base64
 import json
-import urllib.error
-import urllib.request
 import streamlit as st
+import PIL.Image
+from google import genai
+from google.genai import types
 
 # Configurazione della pagina
 st.set_page_config(
@@ -11,15 +11,15 @@ st.set_page_config(
 
 st.title("⚙️ Analisi Ingranaggio con Gemini AI")
 st.write(
-    "Carica il disegno tecnico (blueprint) di un ingranaggio per estrarre i"
-    " parametri geometrici ed eseguire i calcoli meccanici in tempo reale."
+    "Carica il disegno tecnico di un ingranaggio per estrarre i parametri"
+    " geometrici ed eseguire i calcoli meccanici in tempo reale."
 )
 
-# Campo per inserire la chiave API o il token
+# Campo per inserire la chiave API di tipo Auth (AQ...)
 api_key_input = st.text_input(
-    "Chiave API Gemini / Token",
+    "Chiave API Gemini (Auth Key)",
     type="password",
-    value="AQ.Ab8RN6KJaaLdmFug342-gyeYIRsxj_-NRQmErz-Nfl_qgRVapQ",
+    value="AQ.Ab8RN6I6EO0oJouGJgzxwoohao5ArEiq73sP-tG4UKVrQgQguA",
 )
 
 # Pulsante nativo per caricare l'immagine
@@ -36,16 +36,15 @@ if uploaded_file is not None:
       st.error("Per favore, inserisci una chiave API valida.")
     else:
       with st.spinner(
-          "Analisi del disegno in corso con l'intelligenza artificiale..."
+          "Analisi del disegno in corso con il SDK ufficiale e chiavi di"
+          " autorizzazione..."
       ):
         try:
-          # Legge i byte dell'immagine direttamente dal caricamento web
-          image_bytes = uploaded_file.getvalue()
-          image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-          mime_type = uploaded_file.type
+          # Inizializza il client ufficiale Google GenAI (compatibile con le chiavi AQ...)
+          client = genai.Client(api_key=api_key_input)
 
-          # Endpoint con il modello stabile gemini-1.5-flash
-          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key_input}"
+          # Carica l'immagine utilizzando Pillow
+          image = PIL.Image.open(uploaded_file)
 
           prompt = """
                     Analizza questo disegno tecnico di un ingranaggio meccanico. 
@@ -59,37 +58,18 @@ if uploaded_file is not None:
                     Se un valore non è esplicitamente indicato ma può essere dedotto o stimato con ragionevole certezza, segnalalo, altrimenti metti null.
                     """
 
-          payload = {
-              "contents": [{
-                  "parts": [
-                      {"text": prompt},
-                      {
-                          "inline_data": {
-                              "mime_type": mime_type,
-                              "data": image_base64,
-                          }
-                      },
-                  ]
-              }],
-              "generationConfig": {
-                  "responseMimeType": "application/json",
-                  "temperature": 0.1,
-              },
-          }
-
-          req = urllib.request.Request(
-              url,
-              data=json.dumps(payload).encode("utf-8"),
-              headers={"Content-Type": "application/json"},
-              method="POST",
+          # Chiamata al modello tramite il nuovo client (utilizziamo gemini-2.5-flash)
+          response = client.models.generate_content(
+              model="gemini-2.5-flash",
+              contents=[prompt, image],
+              config=types.GenerateContentConfig(
+                  response_mime_type="application/json", temperature=0.1
+              ),
           )
 
-          with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            text_output = res_data["candidates"][0]["content"]["parts"][0][
-                "text"
-            ]
-            dati = json.loads(text_output)
+          # Estrae il testo della risposta
+          text_output = response.text
+          dati = json.loads(text_output)
 
           st.success("Analisi completata con successo!")
 
@@ -97,7 +77,7 @@ if uploaded_file is not None:
           with st.expander("🔍 Visualizza dati grezzi estratti (JSON)"):
             st.json(dati)
 
-          # Estrazione dati per i calcoli
+          # Estrazione dati per i calcoli geometrici
           m = dati.get("modulo")
           z = dati.get("numero_denti")
 
@@ -123,11 +103,5 @@ if uploaded_file is not None:
                 " denti non sono stati rilevati chiaramente dall'IA."
             )
 
-        except urllib.error.HTTPError as e:
-          # Cattura e mostra il testo esatto dell'errore restituito da Google
-          error_details = e.read().decode("utf-8")
-          st.error(
-              f"Errore HTTP {e.code} dal server di Google:\n\n{error_details}"
-          )
         except Exception as e:
-          st.error(f"Errore imprevisto durante l'elaborazione: {e}")
+          st.error(f"Errore durante l'elaborazione della richiesta: {e}")
